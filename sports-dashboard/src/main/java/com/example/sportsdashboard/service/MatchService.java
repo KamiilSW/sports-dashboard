@@ -66,9 +66,10 @@ public class MatchService {
         addMatches(matchesByExternalId, initialResponse.getMatches());
 
         if (matchesByExternalId.size() < 20) {
-            LocalDate dateFrom = LocalDate.now().minusDays(400);
+            LocalDate dateTo = LocalDate.now();
+            LocalDate dateFrom = dateTo.minusDays(400);
             FootballDataResponse olderResponse = getFromApi(
-                    baseUrl + "?status=FINISHED&limit=20&dateFrom=" + dateFrom,
+                    baseUrl + "?status=FINISHED&limit=20&dateFrom=" + dateFrom + "&dateTo=" + dateTo,
                     FootballDataResponse.class);
             if (olderResponse != null && olderResponse.getMatches() != null) {
                 addMatches(matchesByExternalId, olderResponse.getMatches());
