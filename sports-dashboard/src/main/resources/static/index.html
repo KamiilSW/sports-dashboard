@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Premier League Dashboard</title>
+    <style>
+        :root {
+            --ink: #17212b;
+            --muted: #718096;
+            --line: #e5e8ed;
+            --paper: #ffffff;
+            --wash: #f3f5f7;
+            --red: #d71920;
+            --navy: #102a43;
+            --gold: #e4a11b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: radial-gradient(circle at 88% 0%, #dbe9f4 0, transparent 32%), var(--wash);
+            color: var(--ink);
+            font-family: Georgia, 'Times New Roman', serif;
+        }
+
+        .shell { max-width: 1380px; margin: 0 auto; padding: 34px 24px 48px; }
+
+        .masthead {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 24px;
+            margin-bottom: 28px;
+        }
+
+        .eyebrow {
+            margin: 0 0 8px;
+            color: var(--red);
+            font: 700 12px/1.2 Arial, sans-serif;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+        }
+
+        h1, h2, p { margin-top: 0; }
+        h1 { margin-bottom: 8px; font-size: clamp(34px, 5vw, 64px); line-height: .95; font-weight: 700; }
+        h2 { margin-bottom: 4px; font-size: 24px; }
+        .intro { margin-bottom: 0; color: var(--muted); font: 15px/1.5 Arial, sans-serif; }
+
+        button {
+            border: 0;
+            border-radius: 4px;
+            background: var(--navy);
+            color: white;
+            cursor: pointer;
+            font: 700 13px Arial, sans-serif;
+            padding: 12px 16px;
+        }
+
+        button:hover { background: var(--red); }
+        button:disabled { cursor: wait; opacity: .6; }
+
+        .grid { display: grid; grid-template-columns: minmax(420px, .9fr) minmax(500px, 1.4fr); gap: 20px; align-items: start; }
+        .panel { background: var(--paper); border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(16, 42, 67, .07); }
+        .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 22px 22px 16px; border-bottom: 1px solid var(--line); }
+        .panel-label { color: var(--muted); font: 12px Arial, sans-serif; }
+
+        table { width: 100%; border-collapse: collapse; font: 14px Arial, sans-serif; }
+        th { padding: 11px 12px; color: var(--muted); background: #fafbfc; font-size: 11px; letter-spacing: .5px; text-align: right; text-transform: uppercase; }
+        th:first-child, th:nth-child(2), td:first-child, td:nth-child(2) { text-align: left; }
+        td { padding: 11px 12px; border-top: 1px solid var(--line); text-align: right; }
+        .team-row { cursor: pointer; }
+        .team-row:hover, .team-row.selected { background: #fff5f4; }
+        .team-cell { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+        .crest { width: 24px; height: 24px; object-fit: contain; }
+        .rank { width: 28px; color: var(--muted); }
+        .selected-team { color: var(--red); }
+        .match-table td { padding-top: 15px; padding-bottom: 15px; }
+        .score { font-weight: 700; white-space: nowrap; }
+        .empty, .status { padding: 22px; color: var(--muted); font: 14px Arial, sans-serif; }
+        .status { padding: 14px 0 0; }
+        .error { color: var(--red); }
+
+        @media (max-width: 900px) {
+            .masthead { align-items: start; flex-direction: column; }
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 560px) {
+            .shell { padding: 24px 12px 36px; }
+            .panel-head { padding: 18px 14px 14px; }
+            th, td { padding-left: 8px; padding-right: 8px; }
+            th:nth-child(n+5), td:nth-child(n+5) { display: none; }
+        }
+    </style>
+</head>
+<body>
+<main class="shell">
+    <header class="masthead">
+        <div>
+            <p class="eyebrow">2026 / 27 season</p>
+            <h1>Premier League<br />match centre</h1>
+            <p class="intro">Live table, recent form, and every club's last ten finished matches.</p>
+        </div>
+        <button id="refreshButton" type="button">Refresh live data</button>
+    </header>
+
+    <div class="grid">
+        <section class="panel">
+            <div class="panel-head">
+                <div><h2>League table</h2><span class="panel-label">Click a club to inspect its form</span></div>
+                <span id="tableStatus" class="panel-label">Loading...</span>
+            </div>
+            <div id="standingsContent"></div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div><h2 id="teamTitle">Recent matches</h2><span id="teamSubtitle" class="panel-label">Select a team from the table</span></div>
+                <span id="matchesStatus" class="panel-label"></span>
+            </div>
+            <div id="matchesContent" class="empty">Choose a club to see its last 10 finished games.</div>
+        </section>
+    </div>
+    <div id="status" class="status" aria-live="polite"></div>
+</main>
+
+<script>
+    const standingsContent = document.getElementById('standingsContent');
+    const matchesContent = document.getElementById('matchesContent');
+    const tableStatus = document.getElementById('tableStatus');
+    const matchesStatus = document.getElementById('matchesStatus');
+    const teamTitle = document.getElementById('teamTitle');
+    const teamSubtitle = document.getElementById('teamSubtitle');
+    const status = document.getElementById('status');
+    const refreshButton = document.getElementById('refreshButton');
+    let selectedTeamId = null;
+    let standings = [];
+
+    async function requestJson(url) {
+        const response = await fetch(url);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || `Request failed (${response.status})`);
+        return data;
+    }
+
+    function renderStandings() {
+        if (!standings.length) {
+            standingsContent.innerHTML = '<div class="empty">No standings available.</div>';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.innerHTML = '<thead><tr><th>Pos</th><th>Club</th><th>Pl</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>';
+        const body = document.createElement('tbody');
+        standings.forEach((standing) => {
+            const row = document.createElement('tr');
+            row.className = `team-row${String(standing.team.id) === String(selectedTeamId) ? ' selected' : ''}`;
+            row.addEventListener('click', () => loadTeamMatches(standing.team.id, standing.team.name));
+            row.innerHTML = `<td class="rank">${standing.position}</td><td><div class="team-cell"><img class="crest" src="${standing.team.crest || ''}" alt="" /><span>${standing.team.name}</span></div></td><td>${standing.playedGames}</td><td>${standing.won}</td><td>${standing.draw}</td><td>${standing.lost}</td><td>${standing.goalDifference > 0 ? '+' : ''}${standing.goalDifference}</td><td><strong>${standing.points}</strong></td>`;
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        standingsContent.replaceChildren(table);
+    }
+
+    function renderMatches(matches) {
+        if (!matches.length) {
+            matchesContent.innerHTML = '<div class="empty">No finished matches found.</div>';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'match-table';
+        table.innerHTML = '<thead><tr><th>Date</th><th>Home team</th><th>Away team</th><th>Score</th></tr></thead>';
+        const body = document.createElement('tbody');
+        matches.forEach((match) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td><td>${match.homeTeam}</td><td>${match.awayTeam}</td><td class="score">${match.homeScore} - ${match.awayScore}</td>`;
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        matchesContent.replaceChildren(table);
+    }
+
+    async function loadStandings() {
+        tableStatus.textContent = 'Updating...';
+        try {
+            standings = await requestJson('/api/standings');
+            renderStandings();
+            tableStatus.textContent = 'Live now';
+            if (standings.length) {
+                const selected = standings.find((item) => String(item.team.id) === String(selectedTeamId));
+                const team = selected || standings.find((item) => item.team.name.toLowerCase().includes('arsenal')) || standings[0];
+                await loadTeamMatches(team.team.id, team.team.name);
+            }
+        } catch (error) {
+            tableStatus.textContent = 'Unavailable';
+            standingsContent.innerHTML = `<div class="empty error">${error.message}</div>`;
+        }
+    }
+
+    async function loadTeamMatches(teamId, teamName) {
+        selectedTeamId = teamId;
+        renderStandings();
+        teamTitle.textContent = teamName;
+        teamSubtitle.textContent = 'Last 10 finished matches';
+        matchesStatus.textContent = 'Loading...';
+        try {
+            const matches = await requestJson(`/api/teams/${encodeURIComponent(teamId)}/matches`);
+            renderMatches(matches);
+            matchesStatus.textContent = `${matches.length} matches`;
+            status.textContent = '';
+        } catch (error) {
+            matchesStatus.textContent = 'Unavailable';
+            matchesContent.innerHTML = `<div class="empty error">${error.message}</div>`;
+            status.textContent = 'Live match data could not be loaded.';
+        }
+    }
+
+    async function refreshData() {
+        refreshButton.disabled = true;
+        status.textContent = 'Refreshing live standings and selected team...';
+        await loadStandings();
+        refreshButton.disabled = false;
+        status.textContent = 'Updated just now.';
+    }
+
+    refreshButton.addEventListener('click', refreshData);
+    loadStandings();
+</script>
+</body>
+</html>
