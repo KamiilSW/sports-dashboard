@@ -39,16 +39,24 @@ public class Match {
     @Column(name = "away_score", nullable = false)
     private int awayScore;
 
+    @Column(name = "competition_name")
+    private String competitionName;
+
     public Match() {
     }
 
     public Match(String externalMatchId, LocalDateTime date, String homeTeam, String awayTeam, int homeScore, int awayScore) {
+        this(externalMatchId, date, homeTeam, awayTeam, homeScore, awayScore, null);
+    }
+
+    public Match(String externalMatchId, LocalDateTime date, String homeTeam, String awayTeam, int homeScore, int awayScore, String competitionName) {
         this.externalMatchId = externalMatchId;
         this.date = date;
         this.homeTeam = homeTeam;
         this.awayTeam = awayTeam;
         this.homeScore = homeScore;
         this.awayScore = awayScore;
+        this.competitionName = competitionName;
     }
 
     public Long getId() {
@@ -105,5 +113,13 @@ public class Match {
 
     public void setAwayScore(int awayScore) {
         this.awayScore = awayScore;
+    }
+
+    public String getCompetitionName() {
+        return competitionName;
+    }
+
+    public void setCompetitionName(String competitionName) {
+        this.competitionName = competitionName;
     }
 }

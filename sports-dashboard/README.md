@@ -5,7 +5,7 @@ A Spring Boot Premier League dashboard that displays the live league table and t
 ## Features
 
 - Live Premier League standings for all 20 clubs
-- Click any club to load up to its last 10 finished matches
+- Click any club to load up to its last 20 finished matches across all competitions, including competition names
 - Saves fetched matches to PostgreSQL with duplicate protection
 - Live refresh button for the table and selected club
 - REST endpoints for standings and team match history
@@ -58,7 +58,7 @@ http://localhost:8080
 ## API endpoints
 
 - `GET /api/standings` — returns the live Premier League table
-- `GET /api/teams/{teamId}/matches` — fetches up to 10 finished matches for a team and stores them
+- `GET /api/teams/{teamId}/matches` — fetches up to 20 finished matches across all competitions for a team and stores them. If the first response has fewer than 20 matches, a second request looks back approximately 400 days and results are merged by external match ID.
 - `GET /api/matches` — returns all stored match data as JSON
 - `POST /api/matches/refresh` — keeps the original Arsenal refresh endpoint
 

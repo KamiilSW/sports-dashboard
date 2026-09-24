@@ -17,9 +17,12 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class MatchService {
@@ -52,24 +55,53 @@ public class MatchService {
     }
 
     public List<Match> getTeamMatches(String teamId) {
-        String url = footballDataProperties.getBaseUrl()
-                + "/teams/" + teamId + "/matches?status=FINISHED&limit=10";
-        FootballDataResponse response = getFromApi(url, FootballDataResponse.class);
-        if (response == null || response.getMatches() == null) {
+        String baseUrl = footballDataProperties.getBaseUrl() + "/teams/" + teamId + "/matches";
+        FootballDataResponse initialResponse = getFromApi(
+                baseUrl + "?status=FINISHED&limit=20", FootballDataResponse.class);
+        if (initialResponse == null || initialResponse.getMatches() == null) {
             return List.of();
         }
 
-        List<Match> matches = new ArrayList<>();
-        for (FootballDataMatch dto : response.getMatches()) {
-            Match match = toMatch(dto);
-            if (match == null) {
-                continue;
-            }
+        Map<String, Match> matchesByExternalId = new LinkedHashMap<>();
+        addMatches(matchesByExternalId, initialResponse.getMatches());
 
-            Match storedMatch = matchRepository.findByExternalMatchId(match.getExternalMatchId()).orElse(null);
-            matches.add(storedMatch != null ? storedMatch : matchRepository.save(match));
+        if (matchesByExternalId.size() < 20) {
+            LocalDate dateFrom = LocalDate.now().minusDays(400);
+            FootballDataResponse olderResponse = getFromApi(
+                    baseUrl + "?status=FINISHED&limit=20&dateFrom=" + dateFrom,
+                    FootballDataResponse.class);
+            if (olderResponse != null && olderResponse.getMatches() != null) {
+                addMatches(matchesByExternalId, olderResponse.getMatches());
+            }
         }
-        return matches;
+
+        return matchesByExternalId.values().stream()
+                .sorted(Comparator.comparing(Match::getDate).reversed())
+                .limit(20)
+                .map(this::saveOrUpdate)
+                .toList();
+    }
+
+    private void addMatches(Map<String, Match> matchesByExternalId, List<FootballDataMatch> responseMatches) {
+        for (FootballDataMatch dto : responseMatches) {
+            Match match = toMatch(dto);
+            if (match != null) {
+                matchesByExternalId.putIfAbsent(match.getExternalMatchId(), match);
+            }
+        }
+    }
+
+    private Match saveOrUpdate(Match match) {
+        Match storedMatch = matchRepository.findByExternalMatchId(match.getExternalMatchId()).orElse(null);
+        if (storedMatch == null) {
+            return matchRepository.save(match);
+        }
+
+        if (match.getCompetitionName() != null && !match.getCompetitionName().equals(storedMatch.getCompetitionName())) {
+            storedMatch.setCompetitionName(match.getCompetitionName());
+            return matchRepository.save(storedMatch);
+        }
+        return storedMatch;
     }
 
     private <T> T getFromApi(String url, Class<T> responseType) {
@@ -105,7 +137,8 @@ public class MatchService {
         int homeScore = fullTime != null && fullTime.getHome() != null ? fullTime.getHome() : 0;
         int awayScore = fullTime != null && fullTime.getAway() != null ? fullTime.getAway() : 0;
         LocalDateTime matchDate = LocalDateTime.parse(dto.getUtcDate(), DateTimeFormatter.ISO_DATE_TIME);
-        return new Match(dto.getId(), matchDate, dto.getHomeTeam().getName(), dto.getAwayTeam().getName(), homeScore, awayScore);
+        String competitionName = dto.getCompetition() != null ? dto.getCompetition().getName() : null;
+        return new Match(dto.getId(), matchDate, dto.getHomeTeam().getName(), dto.getAwayTeam().getName(), homeScore, awayScore, competitionName);
     }
 
     private String extractApiErrorMessage(String responseBody) {
@@ -222,6 +255,9 @@ public class MatchService {
         @JsonProperty("score")
         private Score score;
 
+        @JsonProperty("competition")
+        private Competition competition;
+
         public String getId() {
             return id;
         }
@@ -260,6 +296,28 @@ public class MatchService {
 
         public void setScore(Score score) {
             this.score = score;
+        }
+
+        public Competition getCompetition() {
+            return competition;
+        }
+
+        public void setCompetition(Competition competition) {
+            this.competition = competition;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Competition {
+        @JsonProperty("name")
+        private String name;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
         }
     }
 

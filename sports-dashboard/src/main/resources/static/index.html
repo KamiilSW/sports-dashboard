@@ -102,7 +102,7 @@
         <div>
             <p class="eyebrow">2026 / 27 season</p>
             <h1>Premier League<br />match centre</h1>
-            <p class="intro">Live table, recent form, and every club's last ten finished matches.</p>
+            <p class="intro">Live table, recent form, and every club's last 20 finished matches across all competitions.</p>
         </div>
         <button id="refreshButton" type="button">Refresh live data</button>
     </header>
@@ -121,7 +121,7 @@
                 <div><h2 id="teamTitle">Recent matches</h2><span id="teamSubtitle" class="panel-label">Select a team from the table</span></div>
                 <span id="matchesStatus" class="panel-label"></span>
             </div>
-            <div id="matchesContent" class="empty">Choose a club to see its last 10 finished games.</div>
+            <div id="matchesContent" class="empty">Choose a club to see its last 20 finished games across all competitions.</div>
         </section>
     </div>
     <div id="status" class="status" aria-live="polite"></div>
@@ -174,11 +174,11 @@
 
         const table = document.createElement('table');
         table.className = 'match-table';
-        table.innerHTML = '<thead><tr><th>Date</th><th>Home team</th><th>Away team</th><th>Score</th></tr></thead>';
+        table.innerHTML = '<thead><tr><th>Date</th><th>Competition</th><th>Home team</th><th>Away team</th><th>Score</th></tr></thead>';
         const body = document.createElement('tbody');
         matches.forEach((match) => {
             const row = document.createElement('tr');
-            row.innerHTML = `<td>${new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td><td>${match.homeTeam}</td><td>${match.awayTeam}</td><td class="score">${match.homeScore} - ${match.awayScore}</td>`;
+            row.innerHTML = `<td>${new Date(match.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</td><td>${match.competitionName || 'Unknown'}</td><td>${match.homeTeam}</td><td>${match.awayTeam}</td><td class="score">${match.homeScore} - ${match.awayScore}</td>`;
             body.appendChild(row);
         });
         table.appendChild(body);
@@ -206,7 +206,7 @@
         selectedTeamId = teamId;
         renderStandings();
         teamTitle.textContent = teamName;
-        teamSubtitle.textContent = 'Last 10 finished matches';
+        teamSubtitle.textContent = 'Last 20 finished matches across all competitions';
         matchesStatus.textContent = 'Loading...';
         try {
             const matches = await requestJson(`/api/teams/${encodeURIComponent(teamId)}/matches`);
